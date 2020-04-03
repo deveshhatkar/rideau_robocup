@@ -35,6 +35,8 @@ public class KrisletEnv extends Environment {
     	
     	mAgents = new HashMap<String, Krislet>();
     	mPlayers = new HashMap<Integer, String>(); 
+    	
+    	
     }
 
     @Override
@@ -62,6 +64,8 @@ public class KrisletEnv extends Environment {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
+			
+			addPercept(agName, Literal.parseLiteral("before_kick_off"));
     	}
     	else
     	{
@@ -69,7 +73,7 @@ public class KrisletEnv extends Environment {
     	}
     	
     	System.out.println("Sensor the environment ");
-    	checkEnv(krislet, agName);
+    	checkEnv(krislet, agName);		//Percepts the Environment and alters agent's beliefs.
     	
     	Memory memory = krislet.m_memory;
     	ObjectInfo object = null;
@@ -77,37 +81,38 @@ public class KrisletEnv extends Environment {
     		object = memory.getObject("ball");
     	
 		if (action.getFunctor().equals("move")){
-			logger.info("Kick off!s");
+			logger.info("PlayerMovedOnGround");
 			krislet.move( -Math.random()*52.5 , 34 - Math.random()*68.0 );
 		}
 		else if (action.getFunctor().equals("turn_fixed_angle")) {
-			logger.info("turn a fixed angle"); 
+			logger.info("TURNFIXEDANGLE"); 
 			krislet.turn(40);
 			memory.waitForNewInfo();
 		}
-		else if (action.getFunctor().equals("turn")) {
-			logger.info("turn to ball with direction"); 
+		else if (action.getFunctor().equals("turnToBall")) {
+			logger.info("TURNTOBALL"); 
 			if (object != null)
 				krislet.turn(object.m_direction);
 			memory.waitForNewInfo();
 		}
 		else if (action.getFunctor().equals("dash")) {
-			logger.info("dash"); 
+			logger.info("DASH"); 
 			if (object != null)
 				krislet.dash(10*object.m_distance);
 		}
 		else if (action.getFunctor().equals("kickToGoal")) {
-			logger.info("kick to goal"); 
+			logger.info("KICKTOGOAL"); 
 			// TBD
 			object = memory.getObject("goal r");
 			if (object != null)
 				krislet.kick(100, object.m_direction);
 		}
 		else if (action.getFunctor().equals("play")){
-			logger.info("play!");
+			logger.info("PERCEPT");
+			checkEnv(krislet, agName);
 		}
 		else if (action.getFunctor().equals("kickToPlayer")) {
-			logger.info("Kick to player");
+			logger.info("KICKTOPLAYER");
 			object = memory.getObject("player");
 			if(memory != null)
 				krislet.kick(100, object.m_direction);
@@ -125,6 +130,114 @@ public class KrisletEnv extends Environment {
     public void stop() {
         super.stop();
     }
+
+    
+    public void checkEnv(Krislet m_krislet, String agName)
+	{
+		ObjectInfo object;
+		Brain brain = m_krislet.getBrain();
+		Memory memory = brain.getMemory();
+		String playMode = brain.getPlayMode();
+		char mySide = brain.getMyside();
+		
+		m_krislet.m_memory = memory;
+		/*if (m_krislet.m_before_kick_off == false) {
+			// first put it somewhere on my side
+			logger.info("entered if..."); 
+			if(Pattern.matches("^before_kick_off.*", playMode))
+				logger.info("before kick off...");
+				//m_krislet.move( -Math.random()*52.5 , 34 - Math.random()*68.0 );
+				addPercept(agName, Literal.parseLiteral("before_kick_off"));
+			m_krislet.m_before_kick_off = true;
+		}*/
+		
+		if(m_krislet.m_kicked_off == false) {
+			
+			logger.info(m_krislet.getBrain().m_playMode);
+			if(m_krislet.getBrain().m_playMode.equals("kickOff")) {
+				logger.info("entered if");
+				addPercept(Literal.parseLiteral("kickOff"));
+				m_krislet.m_kicked_off = true; }
+		}
+	
+		object = memory.getObject("ball");
+		if( object == null ) {
+			/*
+			logger.info("turn"); 
+			// If you don't know where is ball then find it
+			m_krislet.turn(40);
+			m_memory.waitForNewInfo(); */
+			clearPercepts(agName);
+			addPercept(agName, Literal.parseLiteral("ball_not_visible"));
+			addPercept(agName, Literal.parseLiteral("far_to_ball"));
+			addPercept(agName, Literal.parseLiteral("not_face_to_ball"));
+			addPercept(agName, Literal.parseLiteral("no_goal"));
+			
+		    }
+		else if( object.m_distance > 1.0 ) {
+			clearPercepts(agName);
+			addPercept(agName, Literal.parseLiteral("ball_visible"));
+			addPercept(agName, Literal.parseLiteral("far_to_ball"));
+			// If ball is too far then
+			// turn to ball or 
+			// if we have correct direction then go to ball
+			if( object.m_direction != 0 ) {
+			    //m_krislet.turn(object.m_direction);
+				addPercept(agName, Literal.parseLiteral("not_face_to_ball"));
+			}
+			else {
+			    //m_krislet.dash(10*object.m_distance);
+				addPercept(agName, Literal.parseLiteral("face_to_ball"));
+			}
+			
+			addPercept(agName, Literal.parseLiteral("no_goal"));
+		}
+		else 
+		{
+			clearPercepts(agName);
+			addPercept(agName, Literal.parseLiteral("ball_visible"));
+			addPercept(agName, Literal.parseLiteral("close_to_ball"));
+			addPercept(agName, Literal.parseLiteral("face_to_ball"));
+			// We know where is ball and we can kick it
+			// so look for goal
+			if( mySide == 'l' )
+			    object = memory.getObject("goal r");
+			else
+			    object = memory.getObject("goal l");
+	
+			if( object == null )
+			    {
+				//m_krislet.turn(40);
+				//m_memory.waitForNewInfo();
+				addPercept(agName, Literal.parseLiteral("no_goal"));
+			    }
+			else {
+			    //m_krislet.kick(100, object.m_direction);
+				addPercept(agName, Literal.parseLiteral("have_goal"));
+			}
+		}
+		
+		//-----------------------------------------------------------------------------------------
+		
+		object = memory.getObject("player");
+		if(object == null)
+			addPercept(agName, Literal.parseLiteral("playerNotVisible"));
+		else{
+			PlayerInfo player = (PlayerInfo)object; 
+			if (player.m_uniformName != 0) {
+				logger.info("I see a player");
+				String percept = "playerVisible" + "(" + mPlayers.get(player.m_uniformName) + ")"; 
+				addPercept(agName, Literal.parseLiteral(percept));
+				}
+			else
+				addPercept(agName, Literal.parseLiteral("playerNotVisible"));	
+		}
+		// sleep one step to ensure that we will not send
+		// two commands in one cycle.
+		try{
+		    Thread.sleep(/*2**/SoccerParams.simulator_step);
+		}catch(Exception e){} 	
+	}
     
     public ArrayList<Float> getObjectInfo(String objectType, Krislet m_krislet){
     	ArrayList<Float> objectInfo = new ArrayList<Float>(); 
@@ -154,101 +267,6 @@ public class KrisletEnv extends Environment {
     	
     	return objectInfo; 
     }
-
-    
-    public void checkEnv(Krislet m_krislet, String agName)
-	{
-		ObjectInfo object;
-		Brain brain = m_krislet.getBrain();
-		Memory memory = brain.getMemory();
-		String playMode = brain.getPlayMode();
-		char mySide = brain.getMyside();
-		
-		m_krislet.m_memory = memory;
-		if (m_krislet.m_before_kick_off == false) {
-			// first put it somewhere on my side
-			logger.info("entered if..."); 
-			if(Pattern.matches("^before_kick_off.*", playMode))
-				logger.info("before kick off...");
-				//m_krislet.move( -Math.random()*52.5 , 34 - Math.random()*68.0 );
-				addPercept(agName, Literal.parseLiteral("before_kick_off"));
-			m_krislet.m_before_kick_off = true;
-		}
-		
-		if(m_krislet.m_kicked_off == false) {
-			logger.info(m_krislet.getBrain().m_playMode);
-			if(m_krislet.getBrain().m_playMode.equals("kickOff")) {
-				logger.info("entered if");
-				addPercept(Literal.parseLiteral("kickOff"));
-				m_krislet.m_kicked_off = true; }
-		}
-	
-		object = memory.getObject("ball");
-		if( object == null ) {
-			/*
-			logger.info("turn"); 
-			// If you don't know where is ball then find it
-			m_krislet.turn(40);
-			m_memory.waitForNewInfo(); */
-			clearPercepts(agName);
-			addPercept(agName, Literal.parseLiteral("no_ball"));
-		    }
-		else if( object.m_distance > 1.0 ) {
-			clearPercepts(agName);
-			addPercept(agName, Literal.parseLiteral("far_to_ball"));
-			// If ball is too far then
-			// turn to ball or 
-			// if we have correct direction then go to ball
-			if( object.m_direction != 0 ) {
-			    //m_krislet.turn(object.m_direction);
-				addPercept(agName, Literal.parseLiteral("not_face_to_ball"));
-			}
-			else {
-			    //m_krislet.dash(10*object.m_distance);
-				addPercept(agName, Literal.parseLiteral("face_to_ball"));
-			}
-		}
-		else 
-		    {
-			clearPercepts(agName);
-			addPercept(agName, Literal.parseLiteral("close_to_ball"));
-			// We know where is ball and we can kick it
-			// so look for goal
-			if( mySide == 'l' )
-			    object = memory.getObject("goal r");
-			else
-			    object = memory.getObject("goal l");
-	
-			if( object == null )
-			    {
-				//m_krislet.turn(40);
-				//m_memory.waitForNewInfo();
-				addPercept(agName, Literal.parseLiteral("no_goal"));
-			    }
-			else {
-			    //m_krislet.kick(100, object.m_direction);
-				addPercept(agName, Literal.parseLiteral("have_goal"));
-			}
-		    }
-		object = memory.getObject("player");
-		if(object == null)
-			addPercept(agName, Literal.parseLiteral("playerNotVisible"));
-		else{
-			PlayerInfo player = (PlayerInfo)object; 
-			if (player.m_uniformName != 0) {
-				logger.info("I see a player");
-				String percept = "playerVisible" + "(" + mPlayers.get(player.m_uniformName) + ")"; 
-				addPercept(agName, Literal.parseLiteral(percept));
-				}
-			else
-				addPercept(agName, Literal.parseLiteral("playerNotVisible"));	
-		}
-		// sleep one step to ensure that we will not send
-		// two commands in one cycle.
-		try{
-		    Thread.sleep(/*2**/SoccerParams.simulator_step);
-		}catch(Exception e){} 	
-	}
     
 	private  InetAddress	host;
 	private  int	port;
